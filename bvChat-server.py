@@ -10,6 +10,7 @@ import linecache
 port=55555
 
 # Creation connection dictionary of people CURRENTLY CONNECTED 
+# Holds the usernames and connection objects
 clientList = {}
 clientListLock = threading.Lock()
 
@@ -36,10 +37,7 @@ f.close()
 f = open("motd.txt", 'r')
 
 # Getting a random message from the message of the day file
-message = linecache.getline('motd.txt', random.randint(0, 2))
-
-# List to hold the types of messages 
-types = ["who", "exit", "tell", "motd", "me", "help"]
+messageOfTheDay = linecache.getline('motd.txt', random.randint(0, 2))
 
 # Adds all the usernames and password to a dictionary
 def fillListOfUsers():
@@ -81,11 +79,21 @@ def getClientListMsg():
 
 # Displays who is connected right now
 def printClientList():
-    print("Updated list of peers in chat")
+    print("Updated list of users in chat")
     clientListLock.acquire()
     for key in clientList:
-        print(key + " -> "+ clientList[key])
+        print(key)
     clientListLock.release()
+
+# Creates and returns a list of client usernames currently connected 
+# Helps so we can get an updated list of people connected
+def getListOfClientsNow():
+    clients = []
+    clientListLock.acquire()
+    for key in clientList:
+        clients.append(key)
+    clientListLock.release()
+    return clients
 
 # Removes a pre-existing client from participation in the chat
 def removeClientInfo(uName):
@@ -94,40 +102,76 @@ def removeClientInfo(uName):
     printClientList()
     clientListLock.release()
 
+def broadcastMessage(message, sender)
+    clients = getListOfClientsNow()
+    message = "[ " + sender + " ]: " + message
+    for key in clientList:
+        if key == sender:
+            pass
+        else:
+            conn = clientList[key]
+            conn.send(message.encode())
+
+def tell(message, sender, receiver)
+    clients = getListOfClientsNow()
+    message = "[ " + sender + " ]: " + message
+    conn = clientList[key]
+    conn.send(message.encode())
+
 # Continuously listens for commands from the client that is passed 
 def listenToClient(conn, name):
-    #TODO
     clientConnected = True
     while clientConnected:
         clientMessage = getLine(conn)
+        # If the message is a command
         if clientMessage[0] == "/":
             # Split off the command from the message
             clientMessageList = clientMessage.split(" ", 1)
             clientMessageList[0] = clientMessageList[1:]
-            command = clientMessageList[0]
+            command = clientMessageList[0].lower()
             # Check what message it is
-            if command.lower() == "who":
-                #TODO
-            elif command.lower() == "exit":
-                #TODO
-            elif command.lower() == "tell":
-                #TODO
-            elif command.lower() == "motd":
-                #TODO
-            elif command.lower() == "me":
-                #TODO
-            elif command.lower() == "help":
-                #TODO
+            if command == "who":
+                # Sends the number of clients
+                # Then sends the string of clients separated by a newline
+                numClients, clientsMsg = getClientListMsg()
+                conn.send(numClients.encode())
+                conn.send(clientsMsg.encode())
+            elif command == "exit":
+                # Disconnect from the client
+                conn.close()
+                # Delete from the currently connected dict
+                removeClientInfo(name)
+                # Stop listening to the client
+                return
+            elif command == "tell":
+                clientMessageList =  clientMessageList[1].split(" ", 1)
+                receiver = clientMessageList[1][0]
+                message = clientMessageList[1][1]
+                # If the receiver is logged in
+                if receiver in clientList
+                    tell(message, name, receiver)
+                # If the receiver is NOT logged in
+                elif receiver in listOfUsers:
+                    #TODO Store the message somehwere to be grabbed later when logged in.
+                else:
+                    #TODO
+                    # Do we need to send back that the user doesn't exist???????????
+                    print("That user does not exist.")
+            elif command == "motd":
+                conn.send(messageOfTheDay.encode())
+            elif command == "me":
+                message = "*" + name + " " + clientMessageList[1]
+                #TODO Double check this to make sure it is correct.
+                broadcastMessage(message, name)
+            elif command == "help":
+                #TODO Can help be on the client side??????????
             else:
-                #TODO
-            
-            # do that stuff
+                #TODO Do we need to send anything back here also
+                print(command + " is an invalid command.")
+
+        # Broadcast the message
         else:
-            # Send three things
-            # 1. clientName sending the message
-            # 2. b or d for if the message is broadcast or direct message
-            # 3. The actual message itself
-            #TODO
+            broadcastMessage(clientMessage, name)
 
 # Handles the inital setup of a login or new client
 def firstClientConn(connInfo):
@@ -143,9 +187,12 @@ def firstClientConn(connInfo):
         password = getLine(clientConn)
         print("password: " + password)
          
+        #TODO DO we need to send the User who entered bad input a message
+        #????????????????????????????
+        
         # If user is already logged in 
         if username in clientList:
-            print("You are already logged in. You can only login once.")
+            print("That person is already logged in. You can only login once.")
             # disconect from client and return
             clientConn.close()
             return 
@@ -159,7 +206,7 @@ def firstClientConn(connInfo):
         elif username in listOfUsers and password == listOfUsers[username]
             # log them in
             clientListLock.acquire()
-            clientList[username] = [clientIP, clientPort]
+            clientList[username] = clientConn
         # Add a new user to the current users and file of users
         else:
             # Write user to file
@@ -168,12 +215,11 @@ def firstClientConn(connInfo):
             f.close()
             # Write user to currently connected dictionary
             clientListLock.acquire()
-            clientList[username] = [clientIP, clientPort]
+            clientList[username] = clientConn
             clientListLock.release()
-            
 
         # Send message of the day
-        clientConn.send(message.encode())
+        clientConn.send(messageOfTheDay.encode())
         # Call function to listen for commands from client possibly in a thread
         listenToClient(clientConn, username)
 
