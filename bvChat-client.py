@@ -61,9 +61,12 @@ def userInput(serverIP, serverPort):
         code = getLine(serverSock)
         if code == "ok":
             offlineInt = getLine(serverSock)
-            offlineInt = int(offlineInt) 
-            for i in range(offlineInt):
-                print(getLine(serverSock))
+            offlineInt = int(offlineInt)
+            if offlineInt > 0:
+                for i in range(offlineInt):
+                    print(getLine(serverSock))
+            else:
+                print("There were no offline messages")
             logged = True
         else:
             print("Account in use.")
