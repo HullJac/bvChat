@@ -57,17 +57,6 @@ numPeers = 0
 # varibale to refer to listener socket later
 listener = ""
 
-# helps when reading large chunks of data
-def recvAll(conn, msgLength):
-    msg = b''
-    while len(msg) < msgLength:
-        retVal = conn.recv(msgLength - len(msg))
-        msg += retVal
-        if len(retVal) == 0:
-            break
-    return msg
-
-
 # simplifes reading things separated by newlines
 def getLine(conn):
     msg = b''
