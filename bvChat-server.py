@@ -17,6 +17,9 @@ clientListLock = threading.Lock()
 # Dictionary of usernames from FILE
 listOfUsers = {}
 
+# Holds the offline messages
+offlineMessages = {}
+
 # Set up listening socket
 listener = socket(AF_INET, SOCK_STREAM)
 listener.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
@@ -102,19 +105,16 @@ def removeClientInfo(uName):
     printClientList()
     clientListLock.release()
 
-def broadcastMessage(message, sender)
+def broadcastMessage(message, sender):
     clients = getListOfClientsNow()
     message = "[ " + sender + " ]: " + message
     for key in clientList:
-        if key == sender:
-            pass
-        else:
-            conn = clientList[key]
-            conn.send(message.encode())
+        conn = clientList[key]
+        conn.send(message.encode())
 
-def tell(message, sender, receiver)
+def tell(message, sender, receiver):
     clients = getListOfClientsNow()
-    message = "[ " + sender + " ]: " + message
+    message = "{DM from " + sender + "}: " + message
     conn = clientList[key]
     conn.send(message.encode())
 
@@ -148,25 +148,25 @@ def listenToClient(conn, name):
                 receiver = clientMessageList[1][0]
                 message = clientMessageList[1][1]
                 # If the receiver is logged in
-                if receiver in clientList
+                if receiver in clientList:
                     tell(message, name, receiver)
-                # If the receiver is NOT logged in
+                # If the receiver is NOT logged in store the message for later
                 elif receiver in listOfUsers:
-                    #TODO Store the message somehwere to be grabbed later when logged in.
+                    message = "{DM from " + sender + "}: " + message
+                    if receiver in offlineMessages:
+                        offlineMessage[receiver].append(message)
+                    else:
+                        offlineMessages[receiver] = [message]
                 else:
-                    #TODO
-                    # Do we need to send back that the user doesn't exist???????????
                     print("That user does not exist.")
             elif command == "motd":
                 conn.send(messageOfTheDay.encode())
             elif command == "me":
                 message = "*" + name + " " + clientMessageList[1]
-                #TODO Double check this to make sure it is correct.
                 broadcastMessage(message, name)
             elif command == "help":
                 #TODO Can help be on the client side??????????
-            else:
-                #TODO Do we need to send anything back here also
+            else:        
                 print(command + " is an invalid command.")
 
         # Broadcast the message
@@ -187,41 +187,52 @@ def firstClientConn(connInfo):
         password = getLine(clientConn)
         print("password: " + password)
          
-        #TODO DO we need to send the User who entered bad input a message
-        #????????????????????????????
-        
         # If user is already logged in 
         if username in clientList:
             print("That person is already logged in. You can only login once.")
+            clientConn.send("bad\n")
             # disconect from client and return
             clientConn.close()
             return 
         # If username is already taken
         elif username in listOfUsers:
             print("Username is taken already.")
+            clientConn.send("bad\n")
             # disconect from client and return
             clientConn.close()
             return
         # Log the user in if username and password matches
         elif username in listOfUsers and password == listOfUsers[username]
-            # log them in
+            # Log them in
             clientListLock.acquire()
             clientList[username] = clientConn
+            clientConn.send("ok\n")
+            # Sending offline direct messages
+            if username in offlineMessages:
+                numMessages = len(offlineMessages[username])
+                numMessages = str(numMessages) + "\n"
+                clientConn.send(numMessages.encode())
+                for m in offlineMessages[username]:
+                    clientConn.send(m.encode())
+            else:
+                clientConn.send("0\n")
         # Add a new user to the current users and file of users
         else:
             # Write user to file
             f = open('accounts.txt', 'a')
             f.write(username+":"+password+"\n")
             f.close()
-            # Write user to currently connected dictionary
+            # Log them in
             clientListLock.acquire()
             clientList[username] = clientConn
             clientListLock.release()
+            clientConn.send("ok\n")
 
         # Send message of the day
         clientConn.send(messageOfTheDay.encode())
         # Call function to listen for commands from client possibly in a thread
         listenToClient(clientConn, username)
+
 
     except Exception:
         print("Exception occurred, closing connection")
