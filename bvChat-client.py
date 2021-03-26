@@ -7,6 +7,8 @@ import random
 import time
 import hashlib
 
+listenPort = random.randint(1000,5000)
+
 if len(sys.argv) != 3:
     print("Incorrect number of arguments")
     exit()
@@ -17,12 +19,15 @@ serverPort = int(sys.argv[2])
 listener = ''
 
 def recMSG(connInfo):
+    print("MADE IT TO RECMSG")
     serverConn, serverAddr = connInfo
-    numLine = int(getLine(serverConn))
-    print(numLine)
-    for i in range(numLine):
-        message = getLine(serverConn)
-        print(message)
+    msg = "a"
+    while len(msg) != 0:
+        msg = getLine(serverConn)
+        if len(msg) != 0:
+            print(msg)
+        else:
+            pass
 
 # simplifes reading things separated by newlines
 def getLine(conn):
@@ -48,17 +53,22 @@ def listenToServer():
         global listener
         listener = socket(AF_INET, SOCK_STREAM)
         listener.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        listener.bind(('', 0))
+        listener.bind(('', listenPort))
         listener.listen(1)
         while True:
                 threading.Thread(target=recMSG , args=(listener.accept(),), daemon=True).start()
+                print("after listener.accept")
+
     except KeyboardInterrupt:
         listener.close()
 
 def userInput(serverIP, serverPort):
+    global listenPort
     logged = False
     while not logged:
         serverSock = connectToServer(serverIP, serverPort) 
+        listenPort = str(listenPort) + "\n"
+        serverSock.send(listenPort.encode())
         uName = input("Username: ")
         pWord = input("Password: ")
         accountInfo = uName+"\n" + pWord+"\n"
@@ -110,6 +120,7 @@ for i in range(numPeers):
 print(clientList)'''
 
 # listen from the server
+print("Should print")
 listeningThread = threading.Thread(target=listenToServer, daemon=True)
 listeningThread.start()
 
