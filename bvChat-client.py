@@ -11,10 +11,18 @@ if len(sys.argv) != 3:
     print("Incorrect number of arguments")
     exit()
 
-serverIP = sys.argx[1]
+serverIP = sys.argv[1]
 serverPort = int(sys.argv[2])
 
 listener = ''
+
+def recMSG(connInfo):
+    serverConn, serverAddr = connInfo
+    numLine = int(getLine(serverConn))
+    print(numLine)
+    for i in range(numLine):
+        message = getLine(serverConn)
+        print(message)
 
 # simplifes reading things separated by newlines
 def getLine(conn):
@@ -28,7 +36,7 @@ def getLine(conn):
 
 def connectToServer(IP, Port):
     Port = int(Port)
-    serverSock = socket(AF_INET, SOCL_STREAM)
+    serverSock = socket(AF_INET, SOCK_STREAM)
     serverSock.connect( (IP, Port))
     return serverSock
 
@@ -43,9 +51,7 @@ def listenToServer():
         listener.bind(('', 0))
         listener.listen(1)
         while True:
-                print("Listening for connections")
-                threading.Thread(target=giveDataToPeer, args=(listener.accept(),), daemon=True).start()
-                print("received a connection")
+                threading.Thread(target=recMSG , args=(listener.accept(),), daemon=True).start()
     except KeyboardInterrupt:
         listener.close()
 
@@ -59,14 +65,20 @@ def userInput(serverIP, serverPort):
         serverSock.send(accountInfo.encode())
         
         code = getLine(serverSock)
-        if code == "ok":
-            offlineInt = getLine(serverSock)
-            offlineInt = int(offlineInt)
+        print("HERE: " + code)
+        if code == "old":
+            offlineInt = int(getLine(serverSock))
             if offlineInt > 0:
                 for i in range(offlineInt):
                     print(getLine(serverSock))
             else:
                 print("There were no offline messages")
+            motd = getLine(serverSock)
+            print(motd)
+            logged = True
+        elif code == "new":
+            motd = getLine(serverSock)
+            print(motd)
             logged = True
         else:
             print("Account in use.")
@@ -80,8 +92,6 @@ def userInput(serverIP, serverPort):
 
 
 
-        print("Shutting down listener.")
-            
 
 
 '''
@@ -104,7 +114,7 @@ listeningThread = threading.Thread(target=listenToServer, daemon=True)
 listeningThread.start()
 
 # continually ask for chunks, then just listen for other connections.
-mainThread = threading.Thread(target=userInput, daemon=True)
+mainThread = threading.Thread(target=userInput, args=(serverIP, serverPort), daemon=True)
 mainThread.start()
 
 
@@ -112,8 +122,7 @@ while True:
     try:
         pass
     except KeyboardInterrupt:
-        # make sure the threads are done running
-        # properly shutdown the listenThread
+        # FIXME print out exit, and exit the user account
         print('\n[Shutting down]')
         listener.close()
         sys.exit(0) 
