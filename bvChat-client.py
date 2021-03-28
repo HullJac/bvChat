@@ -19,7 +19,7 @@ serverPort = int(sys.argv[2])
 listener = ''
 
 def recMSG(connInfo):
-    print("MADE IT TO RECMSG")
+    print()
     serverConn, serverAddr = connInfo
     msg = "a"
     while len(msg) != 0:
@@ -57,7 +57,6 @@ def listenToServer():
         listener.listen(1)
         while True:
                 threading.Thread(target=recMSG , args=(listener.accept(),), daemon=True).start()
-                print("after listener.accept")
 
     except KeyboardInterrupt:
         listener.close()
@@ -71,71 +70,95 @@ def userInput(serverIP, serverPort):
         serverSock.send(listenPort.encode())
         uName = input("Username: ")
         pWord = input("Password: ")
-        accountInfo = uName+"\n" + pWord+"\n"
-        serverSock.send(accountInfo.encode())
+
+        print("name: " + uName + " word: " + pWord)
+        print("-------------------------------------------------------")
+        accountName = uName+"\n" 
+        accountWord = pWord+"\n"
+        serverSock.send(accountName.encode())
+        serverSock.send(accountWord.encode())
         
         code = getLine(serverSock)
-        print("HERE: " + code)
+        print(code)
         if code == "old":
+            print("-------------------------------------------------------")
             offlineInt = int(getLine(serverSock))
             if offlineInt > 0:
                 for i in range(offlineInt):
                     print(getLine(serverSock))
             else:
                 print("There were no offline messages")
+            print("-------------------------------------------------------")
+            entryMSG = getLine(serverSock)
+            print(entryMSG)
             motd = getLine(serverSock)
-            print(motd)
+            print("Message Of The Day: " + motd)
             logged = True
         elif code == "new":
+            entryMSG = getLine(serverSock)
+            print(entryMSG)
             motd = getLine(serverSock)
-            print(motd)
+            print("Message Of The Day: " + motd)
             logged = True
+        elif code == "ban":
+            print("Failed 3 Attempts. Account is now temporarily banned for 1 minute")
+            serverSock.close()
+        elif code == "trying":
+            print("Bad Attempt")
+            serverSock.close()
+            #sys.exit()
         else:
             print("Account in use.")
             serverSock.close()
 
     exit = False
+    global run
     while not exit:
+        print("-------------------------------------------------------")
         inp = input("> ")
         message = inp+"\n"
         serverSock.send(message.encode())
+        inp.lower()
+
+        try:
+            if inp == "/exit":
+                serverSock.send(inp.encode())
+                print("inside try /exit")
+                serverSock.close()
+                exit = True
+                run = False
+                #sys.exit(0)
+        except KeyboardInterrupt:
+            # FIXME print out exit, and exit the user account
+            print("first kb interrupt")
+            print('\n[Shutting down]')
+            #listener.close()
+            serverSock.close()
+            exit = True
+            run = False
+            #sys.exit(0) 
+    
 
 
 
 
-
-'''
-# main code that sends out threads besides setting up variables at the top
-# setting up client socket stuff
-clientSock = socket(AF_INET, SOCK_STREAM)
-clientSock.connect( (clientIP, clientPort) )   
-connectToServer(clientIP, clientPort, clientSock)
-
-# getting the initial list of other peers and masks
-numPeers = int(getLine(clientSock))
-
-clientList = []
-for i in range(numPeers):
-    clientList.append(getLine(clientSock))
-print(clientList)'''
 
 # listen from the server
-print("Should print")
 listeningThread = threading.Thread(target=listenToServer, daemon=True)
 listeningThread.start()
 
 # continually ask for chunks, then just listen for other connections.
 mainThread = threading.Thread(target=userInput, args=(serverIP, serverPort), daemon=True)
 mainThread.start()
-
-
-while True:
+run = True
+while run:
     try:
         pass
     except KeyboardInterrupt:
         # FIXME print out exit, and exit the user account
+        print("second kb interrupt")
         print('\n[Shutting down]')
-        listener.close()
-        sys.exit(0) 
-    
-        clientSock.close()
+        #listener.close()
+        #serverSock.close()
+        sys.exit(0)
+sys.exit(0)
