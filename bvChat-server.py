@@ -7,7 +7,14 @@ import random
 import time
 import linecache
 
+# Our port
 port=55555
+
+# Holds times of fails
+fails = {}
+
+# If the user is banned
+isBanned = {}
 
 # Creation connection dictionary of people CURRENTLY CONNECTED 
 # Holds the usernames and IPs and Ports
@@ -41,6 +48,12 @@ f = open("motd.txt", 'r')
 
 # Getting a random message from the message of the day file
 messageOfTheDay = linecache.getline('motd.txt', random.randint(1,3))
+
+# Fills isBanned
+def fillBanForIP(ip):
+    global isBanned, fails
+    isBanned[ip] = False
+    fails[ip] = [0,0,0]
 
 # Adds all the usernames and password to a dictionary
 def fillListOfUsers():
@@ -91,6 +104,7 @@ def printClientList():
 # Creates and returns a list of client usernames currently connected 
 # Helps so we can get an updated list of people connected
 def getListOfClientsNow():
+    global clientList
     clients = []
     clientListLock.acquire()
     for key in clientList:
@@ -100,42 +114,38 @@ def getListOfClientsNow():
 
 # Removes a pre-existing client from participation in the chat
 def removeClientInfo(uName):
+    global clientList
     clientListLock.acquire()
     del clientList[uName]
-    printClientList()
     clientListLock.release()
+    printClientList()
 
 def broadcastMessage(message, sender):
     clients = getListOfClientsNow()
     message = "[ " + sender + " ]: " + message
-    print(clients)
-    print(message)
     for key in clientList:
-        #
         ip = clientList[key][0]
         port = int(clientList[key][1])
         sendingSock = socket(AF_INET, SOCK_STREAM)
         sendingSock.connect( (ip, port) )
-        #
-        #conn = clientList[key]
-        one = "1\n"
-        sendingSock.send(one.encode())
+        sendingSock.send(message.encode())
+
+def emoteMessage(message, sender):
+    clients = getListOfClientsNow()
+    for key in clientList:
+        ip = clientList[key][0]
+        port = int(clientList[key][1])
+        sendingSock = socket(AF_INET, SOCK_STREAM)
+        sendingSock.connect( (ip, port) )
         sendingSock.send(message.encode())
 
 def tell(message, sender, receiver):
-    #
     ip = clientList[receiver][0]
     port = int(clientList[receiver][1])
     sendingSock = socket(AF_INET, SOCK_STREAM)
     sendingSock.connect( (ip, port) )
-    #
     clients = getListOfClientsNow()
     message = "{DM from " + sender + "}: " + message
-    print(clients)
-    print(message)
-    #conn = clientList[key]
-    one = "1\n"
-    sendingSock.send(one.encode())
     sendingSock.send(message.encode())
 
 # Continuously listens for commands from the client that is passed 
@@ -143,79 +153,95 @@ def listenToClient(conn, name):
     clientConnected = True
     while clientConnected:
         clientMessage = getLine(conn)
-        ##TODO check if the message is blank
         # If the message is a command
-        if clientMessage[0] == "/":
-            # Split off the command from the message
-            clientMessageList = clientMessage.split(" ", 1)
-            command = clientMessageList[0].lower()
-            # Check what message it is
-            if command == "/who":
-                #TODO adding connection here
-                ip = clientList[name][0]
-                port = int(clientList[name][1])
-                sendingSock = socket(AF_INET, SOCK_STREAM)
-                sendingSock.connect( (ip, port) )
-                # Sends the number of clients
-                # Then sends the string of clients separated by a newline
-                numClients, clientsMsg = getClientListMsg()
-                numClients = str(numClients) + "\n"
-                sendingSock.send(numClients.encode())
-                sendingSock.send(clientsMsg.encode())
-            elif command == "/exit":
-                #TODO add a broadcast of who left
-
-                # Disconnect from the client
-                conn.close()
-                # Delete from the currently connected dict
-                removeClientInfo(name)
-                # Stop listening to the client
-                return
-            elif command == "/tell":
-                clientMessageList =  clientMessageList[1].split(" ", 1)
-                receiver = clientMessageList[1][0]
-                message = clientMessageList[1][1]
-                # If the receiver is logged in
-                if receiver in clientList:
-                    tell(message, name, receiver)
-                # If the receiver is NOT logged in store the message for later
-                elif receiver in listOfUsers:
-                    #TODO  check offline messages and stuff
-                    message = "{DM from " + sender + "}: " + message
-                    if receiver in offlineMessages:
-                        offlineMessage[receiver].append(message)
+        try:
+            if clientMessage[0] == "/":
+                # Split off the command from the message
+                clientMessageList = clientMessage.split(" ", 1)
+                command = clientMessageList[0].lower()
+                # Check what message it is
+                if command == "/who":
+                    ip = clientList[name][0]
+                    port = int(clientList[name][1])
+                    sendingSock = socket(AF_INET, SOCK_STREAM)
+                    sendingSock.connect( (ip, port) )
+                    # Sends the number of clients
+                    # Then sends the string of clients separated by a newline
+                    numClients, clientsMsg = getClientListMsg()
+                    numClients = str(numClients) + "\n"
+                    sendingSock.send(numClients.encode())
+                    sendingSock.send(clientsMsg.encode())
+                elif command == "/exit":
+                    # Delete from the currently connected dict
+                    removeClientInfo(name)
+                    # Send who left the chat
+                    message = "<Left the chat.>"
+                    broadcastMessage(message, name)
+                    # Disconnect from the client
+                    conn.close()
+                    # Stop listening to the client
+                    return
+                elif command == "/tell":
+                    global offlineMessages
+                    clientMessageList =  clientMessageList[1].split(" ", 1)
+                    receiver = clientMessageList[0]
+                    message = clientMessageList[1]
+                    # If the receiver is logged in
+                    if receiver in clientList:
+                        tell(message, name, receiver)
+                    # If the receiver is NOT logged in store the message for later
+                    elif receiver in listOfUsers:
+                        message = str("{DM from " + name + "}: " + message)
+                        if receiver in offlineMessages:
+                            offlineMessages[receiver].append(message)
+                        else:
+                            offlineMessages[receiver] = [message]
                     else:
-                        offlineMessages[receiver] = [message]
-                else:
-                    print("That user does not exist.")
-            elif command == "/motd":
-                conn.send(messageOfTheDay.encode())
-            elif command == "/me":
-                message = "*" + name + " " + clientMessageList[1]
-                broadcastMessage(message, name)
-            elif command == "/help":
-                pass
-                #TODO Can help be on the client side??????????
-            else:        
-                print(command + " is an invalid command.")
+                        print("That user does not exist.")
+                elif command == "/motd":
+                    ip = clientList[name][0]
+                    port = int(clientList[name][1])
+                    sendingSock = socket(AF_INET, SOCK_STREAM)
+                    sendingSock.connect( (ip, port) )
+                    sendingSock.send(messageOfTheDay.encode())
+                elif command == "/me":
+                    message = "*" + name + " " + clientMessageList[1]
+                    emoteMessage(message, name)
+                elif command == "/help":
+                    ip = clientList[name][0]
+                    port = int(clientList[name][1])
+                    sendingSock = socket(AF_INET, SOCK_STREAM)
+                    sendingSock.connect( (ip, port) )
+                    helpCommands = 'The available commands are:\n/who\n/exit\n/tell <username> "message"\n/motd\n/me\n/help'
+                    sendingSock.send(helpCommands.encode())
+                else:        
+                    print(command + " is an invalid command.")
 
-        # Broadcast the message
-        else:
-            # TODO 
-            # setup a new connection and send stuff??????
-            broadcastMessage(clientMessage, name)
+            # Broadcast the message
+            else:
+                broadcastMessage(clientMessage, name)
+        except:
+            pass
 
 # Handles the inital setup of a login or new client
 def firstClientConn(connInfo):
+    global isBanned, fails
+    # TODO temporary ban stuff!!!!!!!!!!!!!!!!!!!!!
+    # TODO make sure it is within 30 seconds
     clientConn, clientAddr = connInfo
     clientIP = clientAddr[0]
+    if clientIP not in isBanned:
+        fillBanForIP(clientIP)
+    if isBanned[clientIP] == True:
+        return 
     clientPort = clientAddr[1]
     print("Received connection from %s:%d" %(clientIP, clientPort))
-
     #try:
     # Get port the client is listening on 
-    sendPort = int(getLine(clientConn))
-    print(sendPort)
+    sendPort = getLine(clientConn)
+    print("Client sending port: " + sendPort)
+    sendPort = int(sendPort)
+    #TODO getting an extra newline after a wrong password try
     # receive username and password
     username = getLine(clientConn)
     print("username: " + username)
@@ -230,30 +256,46 @@ def firstClientConn(connInfo):
         # disconect from client and return
         clientConn.close()
         return 
-    # If username is already taken
-    elif username in listOfUsers:
-        print("Username is taken already.")
-        bad = "bad\n"
-        clientConn.send(bad.encode())
-        # disconect from client and return
-        clientConn.close()
-        return
     # Log the user in if username and password matches
     elif username in listOfUsers and password == listOfUsers[username]:
         # Log them in
         clientListLock.acquire()
         clientList[username] = [clientIP, sendPort]
-        clientConn.send("old\n")
+        clientListLock.release()
+        old = "old\n"
+        clientConn.send(old.encode())
         # Sending offline direct messages
         if username in offlineMessages:
             numMessages = len(offlineMessages[username])
             numMessages = str(numMessages) + "\n"
             clientConn.send(numMessages.encode())
             for m in offlineMessages[username]:
+                m = m + "\n"
                 clientConn.send(m.encode())
         else:
             zero = "0\n"
             clientConn.send(zero.encode())
+    # If the user enters a bad password and a good username
+    elif username in listOfUsers and password != listOfUsers[username]:
+        # Add the latest fail to fails 
+        fails[clientIP][0] = fails[clientIP][1]
+        fails[clientIP][1] = fails[clientIP][2]
+        fails[clientIP][2] = time.time()
+        print(fails[clientIP][2])
+        # If they fails too many time in 30 seconds ban them and make them wait
+        if fails[clientIP][2] - fails[clientIP][0] >= 30 and fails[clientIP][0] != 0:
+            isBanned[clientIP] = True
+            ban = "ban\n"
+            clientConn.send(ban.encode())
+            clientConn.close()
+            time.sleep(60)
+            isBanned[clientIP] = False
+            return
+        else:
+            msg = "trying\n"
+            clientConn.send(msg.encode())
+            clientConn.close()
+            return
     # Add a new user to the current users and file of users
     else:
         # Write user to file
@@ -266,9 +308,16 @@ def firstClientConn(connInfo):
         clientListLock.release()
         ok = "new\n"
         clientConn.send(ok.encode())
+        fillListOfUsers()
     
+    # Send Welcome to the chat
+    welcome = "Welcome to the chat. Keep it PG-13. Type '/help' to see commands.\n"
+    clientConn.send(welcome.encode())
     # Send message of the day
     clientConn.send(messageOfTheDay.encode())
+    # Broadcast who just joined
+    message = "-- " + username + " has entered the chat --"
+    emoteMessage(message, username)
     # Call function to listen for commands from client possibly in a thread
     listenToClient(clientConn, username)
 
