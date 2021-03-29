@@ -290,7 +290,7 @@ def firstClientConn(connInfo):
             clientConn.send(old.encode())
             # Sending offline direct messages
             if username in offlineMessages:
-                offlineMessageLock.acquire()
+                offlineMessagesLock.acquire()
                 numMessages = len(offlineMessages[username])
                 numMessages = str(numMessages) + "\n"
                 clientConn.send(numMessages.encode())
@@ -298,7 +298,7 @@ def firstClientConn(connInfo):
                     m = m + "\n"
                     clientConn.send(m.encode())
                 del offlineMessages[username]
-                offlineMessageLock.release()
+                offlineMessagesLock.release()
             else:
                 zero = "0\n"
                 clientConn.send(zero.encode())
