@@ -169,5 +169,4 @@ while run:
         print("second kb interrupt")
         print('\n[Shutting down]')
         sys.exit(0)
-print("Hi")
 sys.exit(0) 
