@@ -157,7 +157,6 @@ def listenToClient(conn, name):
     clientConnected = True
     while clientConnected:
         clientMessage = getLine(conn)
-        print(clientMessage)
         # If the message is a command
         try:
             if clientMessage[0] == "/":
@@ -258,7 +257,6 @@ def firstClientConn(connInfo):
             fails[clientIP][1] = fails[clientIP][2]
             fails[clientIP][2] = time.time()
             failsLock.release()
-            print(fails[clientIP][2])
             # If they fails too many time in 30 seconds ban them and make them wait
             if fails[clientIP][0] != 0 and fails[clientIP][2] - fails[clientIP][0] <= 30:
                 isBanned[clientIP] = True
