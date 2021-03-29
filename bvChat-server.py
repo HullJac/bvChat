@@ -44,7 +44,7 @@ else:
 
 # Creating the message of the day file
 f = open("motd.txt", 'w')
-f.write("Message of the day.\nWelcome to bvChat.\nLooking good hot stuff.")
+f.write("It's a great day to be a Beaver!\nBe like water my friend.\nLooking good hot stuff.")
 f.close()
 f = open("motd.txt", 'r')
 
