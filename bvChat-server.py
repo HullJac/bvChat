@@ -238,97 +238,97 @@ def firstClientConn(connInfo):
         return 
     clientPort = clientAddr[1]
     print("Received connection from %s:%d" %(clientIP, clientPort))
-    try:
-        # Get port the client is listening on 
-        sendPort = getLine(clientConn)
-        print("Client sending port: " + sendPort)
-        sendPort = int(sendPort)
-        # receive username and password
-        username = getLine(clientConn)
-        print("username: " + username)
-        password = getLine(clientConn)
-        print("password: " + password)
-         
-        # If the user enters a bad password and a good username
-        if username in listOfUsers and password != listOfUsers[username]:
-            # Add the latest fail to fails 
-            failsLock.acquire()
-            fails[clientIP][0] = fails[clientIP][1]
-            fails[clientIP][1] = fails[clientIP][2]
-            fails[clientIP][2] = time.time()
-            failsLock.release()
-            # If they fails too many time in 30 seconds ban them and make them wait
-            if fails[clientIP][0] != 0 and fails[clientIP][2] - fails[clientIP][0] <= 30:
-                isBanned[clientIP] = True
-                ban = "ban\n"
-                clientConn.send(ban.encode())
-                clientConn.close()
-                time.sleep(120)
-                isBanned[clientIP] = False
-                return
-            # If they fail, but not three times in 30 seconds yet
-            else:
-                msg = "trying\n"
-                clientConn.send(msg.encode())
-                clientConn.close()
-                return
-        # If user is already logged in 
-        elif username in clientList:
-            print("That person is already logged in. You can only login once.")
-            bad = "bad\n"
-            clientConn.send(bad.encode())
-            # disconect from client and return
+    #try:
+    # Get port the client is listening on 
+    sendPort = getLine(clientConn)
+    print("Client sending port: " + sendPort)
+    sendPort = int(sendPort)
+    # receive username and password
+    username = getLine(clientConn)
+    print("username: " + username)
+    password = getLine(clientConn)
+    print("password: " + password)
+     
+    # If the user enters a bad password and a good username
+    if username in listOfUsers and password != listOfUsers[username]:
+        # Add the latest fail to fails 
+        failsLock.acquire()
+        fails[clientIP][0] = fails[clientIP][1]
+        fails[clientIP][1] = fails[clientIP][2]
+        fails[clientIP][2] = time.time()
+        failsLock.release()
+        # If they fails too many time in 30 seconds ban them and make them wait
+        if fails[clientIP][0] != 0 and fails[clientIP][2] - fails[clientIP][0] <= 30:
+            isBanned[clientIP] = True
+            ban = "ban\n"
+            clientConn.send(ban.encode())
             clientConn.close()
-            return 
-        # Log the user in if username and password matches
-        elif username in listOfUsers and password == listOfUsers[username]:
-            # Log them in
-            clientListLock.acquire()
-            clientList[username] = [clientIP, sendPort]
-            clientListLock.release()
-            old = "old\n"
-            clientConn.send(old.encode())
-            # Sending offline direct messages
-            if username in offlineMessages:
-                offlineMessageLock.acquire()
-                numMessages = len(offlineMessages[username])
-                numMessages = str(numMessages) + "\n"
-                clientConn.send(numMessages.encode())
-                for m in offlineMessages[username]:
-                    m = m + "\n"
-                    clientConn.send(m.encode())
-                del offlineMessages[username]
-                offlineMessageLock.release()
-            else:
-                zero = "0\n"
-                clientConn.send(zero.encode())
-        # Add a new user to the current users and file of users
+            time.sleep(120)
+            isBanned[clientIP] = False
+            return
+        # If they fail, but not three times in 30 seconds yet
         else:
-            # Write user to file
-            f = open('accounts.txt', 'a')
-            f.write(username+":"+password+"\n")
-            f.close()
-            # Log them in
-            clientListLock.acquire()
-            clientList[username] = [clientIP, sendPort]
-            clientListLock.release()
-            ok = "new\n"
-            clientConn.send(ok.encode())
-            fillListOfUsers()
+            msg = "trying\n"
+            clientConn.send(msg.encode())
+            clientConn.close()
+            return
+    # If user is already logged in 
+    elif username in clientList:
+        print("That person is already logged in. You can only login once.")
+        bad = "bad\n"
+        clientConn.send(bad.encode())
+        # disconect from client and return
+        clientConn.close()
+        return 
+    # Log the user in if username and password matches
+    elif username in listOfUsers and password == listOfUsers[username]:
+        # Log them in
+        clientListLock.acquire()
+        clientList[username] = [clientIP, sendPort]
+        clientListLock.release()
+        old = "old\n"
+        clientConn.send(old.encode())
+        # Sending offline direct messages
+        if username in offlineMessages:
+            offlineMessagesLock.acquire()
+            numMessages = len(offlineMessages[username])
+            numMessages = str(numMessages) + "\n"
+            clientConn.send(numMessages.encode())
+            for m in offlineMessages[username]:
+                m = m + "\n"
+                clientConn.send(m.encode())
+            del offlineMessages[username]
+            offlineMessagesLock.release()
+        else:
+            zero = "0\n"
+            clientConn.send(zero.encode())
+    # Add a new user to the current users and file of users
+    else:
+        # Write user to file
+        f = open('accounts.txt', 'a')
+        f.write(username+":"+password+"\n")
+        f.close()
+        # Log them in
+        clientListLock.acquire()
+        clientList[username] = [clientIP, sendPort]
+        clientListLock.release()
+        ok = "new\n"
+        clientConn.send(ok.encode())
+        fillListOfUsers()
    
-        # Send Welcome to the chat
-        welcome = "Welcome to the chat. Keep it PG-13. Type '/help' to see commands.\n"
-        clientConn.send(welcome.encode())
-        # Send message of the day
-        clientConn.send(messageOfTheDay.encode())
-        # Broadcast who just joined
-        message = "-- " + username + " has entered the chat --"
-        emoteMessage(message, username)
-        # Call function to listen for commands from client possibly in a thread
-        listenToClient(clientConn, username)
+    # Send Welcome to the chat
+    welcome = "Welcome to the chat. Keep it PG-13. Type '/help' to see commands.\n"
+    clientConn.send(welcome.encode())
+    # Send message of the day
+    clientConn.send(messageOfTheDay.encode())
+    # Broadcast who just joined
+    message = "-- " + username + " has entered the chat --"
+    emoteMessage(message, username)
+    # Call function to listen for commands from client possibly in a thread
+    listenToClient(clientConn, username)
     
-    except Exception:
-        print("Exception occurred, closing connection")
+    #except Exception:
+     #   print("Exception occurred, closing connection")
     
 
 running = True
