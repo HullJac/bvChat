@@ -11,7 +11,7 @@ listenPort = random.randint(1000,5000)
 
 if len(sys.argv) != 3:
     print("Incorrect number of arguments")
-    exit()
+    sys.exit(0)
 
 serverIP = sys.argv[1]
 serverPort = int(sys.argv[2])
@@ -48,7 +48,7 @@ def connectToServer(IP, Port):
 
 # function to continuously listen for other peers
 def listenToServer():
-    #start to listen for other peoples connections and get stuff from others. 
+    # Start to listen for messages from the server 
     # Set up listening socket
     try:
         global listener
@@ -64,6 +64,7 @@ def listenToServer():
 
 def userInput(serverIP, serverPort):
     global listenPort, run, inp, serverSock
+    # This while loop logs in the user
     logged = False
     while not logged:
         try:
@@ -82,14 +83,15 @@ def userInput(serverIP, serverPort):
             print("> ", end = '')
             accountName = uName+"\n" 
             accountWord = pWord+"\n"
-            #print("name: " + "#" + accountName + "#" + " word: " + "#" + accountWord+ "#")
 
             serverSock.send(accountName.encode())
             serverSock.send(accountWord.encode())
-            
+           
+            # The type of login that the user has jsut done (new, old, bad, bad password)
             code = getLine(serverSock)
             if code == "old":
                 print("-------------------------------------------------------")
+                # If old, check for offline messages
                 offlineInt = int(getLine(serverSock))
                 if offlineInt > 0:
                     for i in range(offlineInt):
@@ -119,13 +121,14 @@ def userInput(serverIP, serverPort):
                 serverSock.close()
                 sys.exit()
             else:
-                print(" [Account in use.]")
+                print(" [You entered some bad data. Please try again.]")
                 serverSock.close()
         except:
             print(" [Your IP is temporarily banned, can't login to any accounts at this moment.]")
             print(" [Rerun program after time is up.] \n {Closing Program}")
             run = False
 
+    # Continually get input from the user after they have logged in
     exit = False
     while not exit:
         try:
@@ -139,24 +142,19 @@ def userInput(serverIP, serverPort):
                 exit = True
                 run = False
         except KeyboardInterrupt:
-           # FIXME print out exit, and exit the user account
+           # FIXME Print out shutting down, and exit the user account
            print('\n[Shutting down]')
            msg = "/exit\n"
            serverSock.send(msg.encode())
            serverSock.close()
            exit = True
            run = False
-    
 
-
-
-
-
-# listen from the server
+# Listen for messages from the server
 listeningThread = threading.Thread(target=listenToServer, daemon=True)
 listeningThread.start()
 
-# continually ask for chunks, then just listen for other connections.
+# Continually ask the user for input
 mainThread = threading.Thread(target=userInput, args=(serverIP, serverPort), daemon=True)
 mainThread.start()
 run = True
