@@ -142,7 +142,6 @@ def userInput(serverIP, serverPort):
                 exit = True
                 run = False
         except KeyboardInterrupt:
-           # FIXME Print out shutting down, and exit the user account
            print('\n[Shutting down]')
            msg = "/exit\n"
            serverSock.send(msg.encode())
